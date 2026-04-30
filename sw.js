@@ -1,4 +1,4 @@
-const CACHE_NAME = 'passgen-v1';
+const CACHE_NAME = 'passgen-v2';
 const ASSETS = [
     './',
     './index.html',
@@ -25,9 +25,17 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// Fetch — serve from cache first, fallback to network
+// Fetch — Stale-while-revalidate strategy (ensures auto-updates in background)
 self.addEventListener('fetch', event => {
     event.respondWith(
-        caches.match(event.request).then(cached => cached || fetch(event.request))
+        caches.match(event.request).then(cachedResponse => {
+            const fetchPromise = fetch(event.request).then(networkResponse => {
+                caches.open(CACHE_NAME).then(cache => {
+                    cache.put(event.request, networkResponse.clone());
+                });
+                return networkResponse;
+            });
+            return cachedResponse || fetchPromise;
+        })
     );
 });
