@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Secure Phrase Generator</title>
+    <meta name="description" content="Generate strong, memorable sentence-based passwords with military-grade entropy. Works offline.">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PassGen">
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.svg" type="image/svg+xml">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700;800&display=swap');
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050505;
+            /* Safe area insets for notched phones */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+        
+        .password-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Responsive password sizing */
+        #passwordOutput {
+            font-size: clamp(1.25rem, 5vw, 6rem);
+            word-break: break-all;
+            overflow-wrap: anywhere;
+            line-height: 1.2;
+        }
+
+        /* Toast animation */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px) translateX(-50%); }
+            to { opacity: 1; transform: translateY(0) translateX(-50%); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0) translateX(-50%); }
+            to { opacity: 0; transform: translateY(-20px) translateX(-50%); }
+        }
+        
+        .toast {
+            position: fixed;
+            top: calc(32px + env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            z-index: 100;
+            max-width: calc(100vw - 2rem);
+        }
+        .toast.hide {
+            animation: fadeOut 0.3s ease forwards;
+        }
+
+        /* Mobile dock adjustments */
+        @media (max-width: 420px) {
+            .dock-wrapper {
+                bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+                width: calc(100% - 1rem) !important;
+            }
+            .strength-widget {
+                width: 100% !important;
+                border-radius: 1rem !important;
+                padding: 0.75rem !important;
+            }
+            .action-dock {
+                gap: 0.25rem !important;
+                padding: 0.35rem !important;
+            }
+            .seg-btn {
+                padding: 0.6rem 0.75rem !important;
+                font-size: 0.7rem !important;
+            }
+            .action-btn {
+                padding: 0.65rem !important;
+            }
+            .action-btn svg {
+                width: 16px;
+                height: 16px;
+            }
+        }
+
+        /* Ensure password area doesn't overlap dock on small screens */
+        @media (max-height: 600px) {
+            .password-area {
+                padding-bottom: 180px !important;
+            }
+            #passwordOutput {
+                min-height: 80px !important;
+                font-size: clamp(1rem, 4vw, 3rem) !important;
+            }
+        }
+
+        /* Prevent text selection flicker on mobile */
+        .no-select {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Touch feedback for buttons */
+        @media (hover: none) {
+            .touch-active:active {
+                transform: scale(0.92);
+                opacity: 0.8;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen min-h-[100dvh] flex flex-col relative overflow-hidden selection:bg-indigo-500/30">
+
+    <!-- Ambient Background Effects -->
+    <div class="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/10 blur-[120px] pointer-events-none"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-fuchsia-600/10 blur-[120px] pointer-events-none"></div>
+
+    <main class="password-area flex-1 flex flex-col items-center justify-center p-4 sm:p-6 z-10 w-full max-w-6xl mx-auto" style="padding-bottom: 200px;">
+        
+        <!-- Header Badge -->
+        <div class="mb-6 sm:mb-12 text-center">
+            <div class="inline-flex items-center justify-center p-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                <span class="px-3 sm:px-4 py-1 text-[9px] sm:text-[10px] font-bold tracking-[0.2em] uppercase text-indigo-300">Secure Phrase Generator</span>
+            </div>
+        </div>
+
+        <!-- Password Display -->
+        <div class="w-full text-center relative group px-2">
+            <p id="passwordOutput" class="password-font font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-indigo-100 to-indigo-400 select-all min-h-[60px] sm:min-h-[120px] md:min-h-[200px] flex items-center justify-center drop-shadow-2xl transition-all duration-300 cursor-text">
+                Loading...
+            </p>
+        </div>
+
+    </main>
+
+    <!-- Floating Dock (Controls & Stats) — reversed order: actions at bottom edge, strength above -->
+    <div class="dock-wrapper fixed bottom-3 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center w-[calc(100%-1rem)] sm:w-auto z-50">
+        
+        <!-- Strength Indicator (compact on mobile) -->
+        <div class="strength-widget w-full sm:w-[400px] mb-2 sm:mb-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-2xl">
+            <div class="flex justify-between items-center mb-1.5 sm:mb-3">
+                <span id="strengthText" class="text-[9px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-widest">Strong</span>
+                <span id="entropySubtext" class="text-[8px] sm:text-[10px] text-slate-400 font-mono tracking-wider">L: 0 | C: ...</span>
+            </div>
+            <div class="h-1 sm:h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                <div id="strengthBar" class="h-full bg-emerald-400 transition-all duration-700 w-full shadow-[0_0_10px_rgba(52,211,153,0.5)]"></div>
+            </div>
+        </div>
+
+        <!-- Main Action Dock -->
+        <div class="action-dock flex items-center gap-1 sm:gap-2 p-1 sm:p-2 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
+            
+            <!-- Segmented Length Control -->
+            <div class="flex bg-white/5 p-0.5 rounded-full border border-white/5">
+                <label class="relative">
+                    <input type="radio" name="complexity" value="short" class="peer hidden" onchange="generatePassword()">
+                    <div class="seg-btn peer-checked:bg-white/15 peer-checked:text-white peer-checked:shadow-sm rounded-full px-3 py-2 sm:px-6 sm:py-3 cursor-pointer text-[11px] sm:text-sm font-semibold transition-all text-slate-400 hover:text-slate-200 no-select touch-active">Short</div>
+                </label>
+                <label class="relative">
+                    <input type="radio" name="complexity" value="medium" checked class="peer hidden" onchange="generatePassword()">
+                    <div class="seg-btn peer-checked:bg-white/15 peer-checked:text-white peer-checked:shadow-sm rounded-full px-3 py-2 sm:px-6 sm:py-3 cursor-pointer text-[11px] sm:text-sm font-semibold transition-all text-slate-400 hover:text-slate-200 no-select touch-active">Medium</div>
+                </label>
+                <label class="relative">
+                    <input type="radio" name="complexity" value="long" class="peer hidden" onchange="generatePassword()">
+                    <div class="seg-btn peer-checked:bg-white/15 peer-checked:text-white peer-checked:shadow-sm rounded-full px-3 py-2 sm:px-6 sm:py-3 cursor-pointer text-[11px] sm:text-sm font-semibold transition-all text-slate-400 hover:text-slate-200 no-select touch-active">Long</div>
+                </label>
+            </div>
+
+            <div class="w-px h-6 sm:h-8 bg-white/10 mx-0.5 sm:mx-2"></div>
+
+            <!-- Buttons -->
+            <button onclick="generatePassword()" class="action-btn p-2 sm:p-4 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 transition-all active:scale-90 touch-active" aria-label="Regenerate" title="Generate New">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+            <button onclick="copyToClipboard()" class="action-btn p-2 sm:p-4 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)] transition-all active:scale-90 touch-active" aria-label="Copy" title="Copy Password">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Hidden Input for Copy Fallback -->
+    <input type="text" id="hiddenCopyInput" class="hidden absolute opacity-0" aria-hidden="true">
+
+    <script src="generator.js"></script>
+    <script>
+        // Register Service Worker for offline support (PWA)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
