@@ -1,10 +1,12 @@
-const CACHE_NAME = 'passgen-v4';
+const CACHE_NAME = 'passgen-v5';
 const ASSETS = [
     './',
     './index.html',
     './generator.js',
     './manifest.json',
-    './icon-192-new.png',
+    './icon-180.png',
+    './icon-192.png',
+    './icon-384.png',
     './icon-512.png',
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700;800&display=swap'
 ];
