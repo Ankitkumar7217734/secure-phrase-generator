@@ -1,10 +1,3 @@
-// ============================================================
-// HARDENED SENTENCE PASSWORD GENERATOR
-// Defense-in-depth: large word pools + character mutation +
-// structural randomization + bias-free CSPRNG
-// ============================================================
-
-// --- EXPANDED WORD POOLS (250 each = 62,500x base combos vs original) ---
 const adjectives = [
     "brave","calm","clever","clumsy","eager","fierce","gentle","happy","jolly","kind",
     "lazy","proud","silly","swift","wild","ancient","bright","cold","dark","deep",
@@ -31,7 +24,7 @@ const adjectives = [
     "large","lavish","lean","level","lively","livid","loyal","lush","marble","marine",
     "massive","mature","meager","mental","merry","mild","mini","mobile","modern","modest",
     "moody","muted","naive","nasty","native","nervy","nimble","normal","novel","opaque"
-]; // 250
+];
 
 const nouns = [
     "alien","bear","cat","dog","dragon","eagle","fox","ghost","knight","ninja",
@@ -59,7 +52,7 @@ const nouns = [
     "spiral","sponge","sprout","squirrel","stallion","steam","summit","swan","tablet","talon",
     "thorn","timber","token","torch","tower","trail","trident","trophy","tunnel","turtle",
     "tusk","valve","vapor","vessel","viper","walrus","wheat","whistle","willow","wraith"
-]; // 250
+];
 
 const verbs = [
     "builds","crawls","dances","dreams","drinks","eats","explores","flies","hides","jumps",
@@ -87,7 +80,7 @@ const verbs = [
     "leaves","lends","levels","limits","links","lists","loads","locks","logs","looks",
     "lowers","lurks","manages","maps","marks","matches","melts","mends","merges","mines",
     "mixes","molds","mounts","moves","mutes","names","nests","nods","notes","nurses"
-]; // 250
+];
 
 const adverbs = [
     "badly","bravely","brightly","calmly","carefully","clearly","closely","darkly","easily","fast",
@@ -115,12 +108,27 @@ const adverbs = [
     "obediently","obliquely","obtusely","officially","ominously","outwardly","painfully","palely","partially","passively",
     "patiently","pensively","playfully","politely","possibly","potently","precisely","primly","privately","promptly",
     "properly","publicly","quaintly","queasily","queerly","radiantly","randomly","rapidly","rawly","readily"
-]; // 250
+];
 
 const symbols = ["!","@","#","$","%","^","&","*","?","~","-","+","=","_",":","<",">","{","}"];
-const mutationChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+const mutationCharsStandard = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+const mutationCharsNoSimilar = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%^&*";
 
-// --- BIAS-FREE CSPRNG (rejection sampling) ---
+let settings = {
+    excludeSimilar: localStorage.getItem('excludeSimilar') === 'true',
+    hapticEnabled: localStorage.getItem('hapticEnabled') !== 'false',
+    pinlockEnabled: localStorage.getItem('pinlockEnabled') !== 'false'
+};
+
+let isPasswordRevealed = false;
+let revealTimeout = null;
+
+const LENGTH_RANGES = {
+    short:  { min: 15, max: 20 },
+    medium: { min: 15, max: 25 },
+    long:   { min: 25, max: 45 }
+};
+
 function getSecureRandomInt(max) {
     if (max <= 1) return 0;
     const randomBuffer = new Uint32Array(1);
@@ -135,12 +143,9 @@ function getRandom(arr) {
     return arr[getSecureRandomInt(arr.length)];
 }
 
-// --- CHARACTER MUTATION ENGINE ---
-// Injects random characters at random positions within a word.
-// Even if an attacker knows every word in the list, they cannot
-// predict WHERE the injections happen or WHAT characters are used.
 function mutateWord(word) {
-    const numInsertions = 1 + getSecureRandomInt(3); // 1-3 random chars
+    const mutationChars = settings.excludeSimilar ? mutationCharsNoSimilar : mutationCharsStandard;
+    const numInsertions = 1 + getSecureRandomInt(3);
     let chars = word.split('');
     for (let i = 0; i < numInsertions; i++) {
         const pos = getSecureRandomInt(chars.length + 1);
@@ -150,7 +155,6 @@ function mutateWord(word) {
     return chars.join('');
 }
 
-// --- FISHER-YATES SHUFFLE (secure) ---
 function secureShuffle(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -160,85 +164,67 @@ function secureShuffle(arr) {
     return a;
 }
 
-// --- LENGTH RANGES PER MODE ---
-const LENGTH_RANGES = {
-    short:  { min: 15, max: 20 },
-    medium: { min: 15, max: 25 },
-    long:   { min: 25, max: 45 }
-};
-
-// --- CORE GENERATOR ---
 function generatePassword() {
+    triggerHaptic();
     const complexity = document.querySelector('input[name="complexity"]:checked')?.value || 'medium';
     const { min: minLen, max: maxLen } = LENGTH_RANGES[complexity];
     const allPools = [adjectives, nouns, verbs, adverbs];
 
-    // Target a length randomly within the range
     const targetLen = minLen + getSecureRandomInt(maxLen - minLen + 1);
 
     let finalPassword = "";
     let wordCount = 0;
-    const MAX_ATTEMPTS = 50; // safety valve
+    const MAX_ATTEMPTS = 50;
 
-    // Keep adding words + separators until we reach the target
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         const pool = allPools[getSecureRandomInt(allPools.length)];
         let word = getRandom(pool);
-
-        // Mutate: inject 1-2 random characters
         word = mutateWord(word);
-
-        // Mixed casing per character
         word = word.split('').map(ch =>
             getSecureRandomInt(2) === 1 ? ch.toUpperCase() : ch.toLowerCase()
         ).join('');
 
-        // Add separator before word (if not the first)
         if (finalPassword.length > 0) {
             const sep = getSecureRandomInt(2) === 1
                 ? getRandom(symbols)
                 : String(getSecureRandomInt(10));
             const candidate = finalPassword + sep + word;
-            if (candidate.length > maxLen) break; // would overshoot — stop
+            if (candidate.length > maxLen) break;
             finalPassword = candidate;
         } else {
-            if (word.length > maxLen) continue; // skip if single word exceeds max
+            if (word.length > maxLen) continue;
             finalPassword = word;
         }
         wordCount++;
 
-        // If we've reached the target length zone, stop
         if (finalPassword.length >= targetLen) break;
     }
 
-    // Pad with random chars if still under minimum
     while (finalPassword.length < minLen) {
+        const mutationChars = settings.excludeSimilar ? mutationCharsNoSimilar : mutationCharsStandard;
         const padChar = mutationChars[getSecureRandomInt(mutationChars.length)];
         finalPassword += padChar;
     }
 
-    // Trim if over maximum (shouldn't happen often due to the break above)
     if (finalPassword.length > maxLen) {
         finalPassword = finalPassword.slice(0, maxLen);
     }
 
     document.getElementById('passwordOutput').textContent = finalPassword;
     updateStrengthMeter(finalPassword.length, wordCount);
+    hidePassword();
 }
 
-// --- ENTROPY ESTIMATOR (conservative lower bound in bits) ---
 function updateStrengthMeter(length, wordCount) {
     const bar = document.getElementById('strengthBar');
     const text = document.getElementById('strengthText');
     const subtext = document.getElementById('entropySubtext');
 
-    // Conservative entropy estimate:
-    // Per word: log2(250) pool + log2(avg mutations) + casing bits
-    const bitsPerWord = Math.log2(250)  // word selection (~8 bits)
-        + Math.log2(2 * 70)             // avg 2 insertions from 70-char set (~7.1 bits)
-        + 5;                            // mixed casing (~5 bits avg)
-    const separatorBits = Math.log2(19 + 10); // symbol or digit separator
-    const suffixBits = Math.log2(1000) + Math.log2(19); // number + symbol
+    const bitsPerWord = Math.log2(250)
+        + Math.log2(2 * 70)
+        + 5;
+    const separatorBits = Math.log2(19 + 10);
+    const suffixBits = Math.log2(1000) + Math.log2(19);
 
     const totalBits = Math.floor(
         (bitsPerWord * wordCount)
@@ -266,14 +252,13 @@ function updateStrengthMeter(length, wordCount) {
     }
 }
 
-// --- TOAST ---
 function showToast(message) {
     const existing = document.getElementById('toastMsg');
     if (existing) existing.remove();
 
     const toast = document.createElement('div');
     toast.id = 'toastMsg';
-    toast.className = 'toast bg-white/10 backdrop-blur-xl border border-white/20 text-white px-6 py-4 rounded-2xl shadow-2xl font-medium text-sm flex items-center gap-3';
+    toast.className = 'toast bg-white/10 backdrop-blur-xl border border-white/20 px-6 py-4 rounded-2xl shadow-2xl font-medium text-sm flex items-center gap-3';
     toast.innerHTML = `
         <div class="bg-indigo-500 p-1 rounded-full text-white">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -287,12 +272,13 @@ function showToast(message) {
     }, 2500);
 }
 
-// --- CLIPBOARD ---
 function copyToClipboard() {
+    triggerHaptic();
     const textToCopy = document.getElementById('passwordOutput').textContent;
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(textToCopy).then(() => {
             showToast('Password copied to clipboard!');
+            addToHistory(textToCopy);
         }).catch(() => fallbackCopy(textToCopy));
     } else {
         fallbackCopy(textToCopy);
@@ -308,6 +294,7 @@ function fallbackCopy(text) {
     try {
         document.execCommand('copy');
         showToast('Password copied to clipboard!');
+        addToHistory(text);
     } catch (err) {
         showToast('Failed to copy. Please select and copy manually.');
     }
@@ -315,7 +302,172 @@ function fallbackCopy(text) {
     window.getSelection().removeAllRanges();
 }
 
-// --- INIT ---
+function triggerHaptic() {
+    if (settings.hapticEnabled && navigator.vibrate) {
+        navigator.vibrate(10);
+    }
+}
+
+function toggleTheme() {
+    triggerHaptic();
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    if (current === 'light') {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'dark');
+    } else {
+        html.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
+    }
+}
+
+function revealPassword() {
+    if (!settings.pinlockEnabled) return;
+    triggerHaptic();
+    const overlay = document.getElementById('pinlockOverlay');
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+    isPasswordRevealed = true;
+
+    clearTimeout(revealTimeout);
+    revealTimeout = setTimeout(() => {
+        hidePassword();
+    }, 5000);
+}
+
+function hidePassword() {
+    if (!settings.pinlockEnabled) return;
+    const overlay = document.getElementById('pinlockOverlay');
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
+    isPasswordRevealed = false;
+    clearTimeout(revealTimeout);
+}
+
+function getHistory() {
+    try {
+        return JSON.parse(localStorage.getItem('passwordHistory') || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function addToHistory(password) {
+    if (!password || password === 'Loading...') return;
+    let history = getHistory();
+    history = history.filter(p => p !== password);
+    history.unshift(password);
+    if (history.length > 10) history = history.slice(0, 10);
+    localStorage.setItem('passwordHistory', JSON.stringify(history));
+    renderHistory();
+}
+
+function renderHistory() {
+    const list = document.getElementById('historyList');
+    const history = getHistory();
+
+    if (history.length === 0) {
+        list.innerHTML = '<div class="p-4 text-center text-slate-500 text-sm">No passwords saved yet</div>';
+        return;
+    }
+
+    list.innerHTML = history.map((password, i) => `
+        <div class="history-item flex items-center justify-between gap-2" onclick="copyFromHistory(${i})">
+            <span class="truncate flex-1" style="color: var(--text-primary);">${escapeHtml(password)}</span>
+            <span class="text-xs text-slate-500 flex-shrink-0">${i + 1}</span>
+        </div>
+    `).join('');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function copyFromHistory(index) {
+    triggerHaptic();
+    const history = getHistory();
+    if (history[index]) {
+        const hiddenInput = document.getElementById('hiddenCopyInput');
+        hiddenInput.value = history[index];
+        hiddenInput.classList.remove('hidden');
+        hiddenInput.select();
+        hiddenInput.setSelectionRange(0, 99999);
+        document.execCommand('copy');
+        hiddenInput.classList.add('hidden');
+        window.getSelection().removeAllRanges();
+        showToast('Password copied!');
+    }
+    closePanels();
+}
+
+function clearHistory() {
+    triggerHaptic();
+    localStorage.removeItem('passwordHistory');
+    renderHistory();
+    showToast('History cleared');
+}
+
+function openHistory() {
+    triggerHaptic();
+    renderHistory();
+    document.getElementById('historyPanel').classList.add('open');
+    document.getElementById('panelBackdrop').classList.add('open');
+}
+
+function openSettings() {
+    triggerHaptic();
+    updateSettingsUI();
+    document.getElementById('settingsPanel').classList.add('open');
+    document.getElementById('panelBackdrop').classList.add('open');
+}
+
+function closePanels() {
+    document.getElementById('historyPanel').classList.remove('open');
+    document.getElementById('settingsPanel').classList.remove('open');
+    document.getElementById('panelBackdrop').classList.remove('open');
+}
+
+function updateSettingsUI() {
+    const excludeToggle = document.getElementById('excludeSimilarToggle');
+    const hapticToggle = document.getElementById('hapticToggle');
+    const pinlockToggle = document.getElementById('pinlockToggle');
+
+    excludeToggle.classList.toggle('active', settings.excludeSimilar);
+    hapticToggle.classList.toggle('active', settings.hapticEnabled);
+    pinlockToggle.classList.toggle('active', settings.pinlockEnabled);
+}
+
+function toggleExcludeSimilar() {
+    triggerHaptic();
+    settings.excludeSimilar = !settings.excludeSimilar;
+    localStorage.setItem('excludeSimilar', settings.excludeSimilar);
+    updateSettingsUI();
+    generatePassword();
+}
+
+function toggleHaptic() {
+    settings.hapticEnabled = !settings.hapticEnabled;
+    localStorage.setItem('hapticEnabled', settings.hapticEnabled);
+    updateSettingsUI();
+    if (settings.hapticEnabled) triggerHaptic();
+}
+
+function togglePinlock() {
+    triggerHaptic();
+    settings.pinlockEnabled = !settings.pinlockEnabled;
+    localStorage.setItem('pinlockEnabled', settings.pinlockEnabled);
+    updateSettingsUI();
+    if (settings.pinlockEnabled) {
+        hidePassword();
+    } else {
+        const overlay = document.getElementById('pinlockOverlay');
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     generatePassword();
 });
