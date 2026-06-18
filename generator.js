@@ -319,6 +319,7 @@ function toggleTheme() {
         html.setAttribute('data-theme', 'light');
         localStorage.setItem('theme', 'light');
     }
+    updateSettingsUI();
 }
 
 function revealPassword() {
@@ -327,6 +328,7 @@ function revealPassword() {
     const overlay = document.getElementById('pinlockOverlay');
     overlay.style.opacity = '0';
     overlay.style.pointerEvents = 'none';
+    document.getElementById('passwordOutput').classList.remove('pw-hidden');
     isPasswordRevealed = true;
 
     clearTimeout(revealTimeout);
@@ -340,6 +342,7 @@ function hidePassword() {
     const overlay = document.getElementById('pinlockOverlay');
     overlay.style.opacity = '1';
     overlay.style.pointerEvents = 'auto';
+    document.getElementById('passwordOutput').classList.add('pw-hidden');
     isPasswordRevealed = false;
     clearTimeout(revealTimeout);
 }
@@ -430,10 +433,12 @@ function closePanels() {
 }
 
 function updateSettingsUI() {
+    const themeToggle = document.getElementById('themeToggleSetting');
     const excludeToggle = document.getElementById('excludeSimilarToggle');
     const hapticToggle = document.getElementById('hapticToggle');
     const pinlockToggle = document.getElementById('pinlockToggle');
 
+    themeToggle.classList.toggle('active', document.documentElement.getAttribute('data-theme') === 'light');
     excludeToggle.classList.toggle('active', settings.excludeSimilar);
     hapticToggle.classList.toggle('active', settings.hapticEnabled);
     pinlockToggle.classList.toggle('active', settings.pinlockEnabled);
@@ -465,6 +470,7 @@ function togglePinlock() {
         const overlay = document.getElementById('pinlockOverlay');
         overlay.style.opacity = '0';
         overlay.style.pointerEvents = 'none';
+        document.getElementById('passwordOutput').classList.remove('pw-hidden');
     }
 }
 

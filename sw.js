@@ -1,4 +1,4 @@
-const CACHE_NAME = 'passgen-v5';
+const CACHE_NAME = 'passgen-v10';
 const ASSETS = [
     './',
     './index.html',
