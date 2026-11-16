@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PassGen - Direction C Quartz</title>
+<style>
+  /* Direction C - Quartz. Refinement, quieter and more spacious. Copy is the success action. */
+  :root {
+    --bg: #0F1116;
+    --stage: #14161C;
+    --card: #191C23;
+    --card-2: #1F232C;
+    --line: #272C36;
+    --line-2: #323845;
+    --text: #E9EDF3;
+    --muted: #97A0AE;
+    --faint: #666F7D;
+    --mint: #3DDC97;
+    --mint-ink: #06281A;
+    --mint-dim: rgba(61, 220, 151, 0.12);
+    --focus: #8B93F8;
+    --warn: #E8C468;
+    --bad: #E37C7C;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --r-lg: 16px;
+    --r-md: 12px;
+    --r-sm: 8px;
+    --r-pill: 999px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html { color-scheme: dark; }
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(ellipse 70% 45% at 15% 0%, rgba(61,220,151,0.06), transparent 65%),
+      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(139,147,248,0.05), transparent 65%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    display: grid;
+    place-items: start center;
+    padding: 24px 16px 40px;
+  }
+  .dir-tag {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    color: var(--faint); margin-bottom: 14px; text-align: center;
+  }
+  .popup {
+    width: 100%; max-width: 400px; min-height: 560px;
+    background: var(--stage);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 28px 70px rgba(0,0,0,0.45);
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 8px;
+  }
+  svg { display: block; }
+  .ic { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 650; font-size: 14px; letter-spacing: -0.01em; }
+  .brand-mark {
+    width: 26px; height: 26px; display: grid; place-items: center;
+    background: var(--mint-dim); color: var(--mint);
+    border: 1px solid rgba(61,220,151,0.22);
+    border-radius: 9px;
+  }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    font-size: 12.5px; font-weight: 600; color: var(--faint);
+    padding: 6px 12px; border-radius: var(--r-pill);
+    transition: color .15s, background .15s;
+  }
+  .tab:hover { color: var(--muted); }
+  .tab[aria-selected="true"] { color: var(--text); background: var(--card); }
+  .count {
+    font-family: var(--mono); font-size: 10px; color: var(--mint);
+    margin-left: 3px;
+  }
+
+  .view { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
+  /* engraved plate */
+  .plate {
+    background: linear-gradient(165deg, var(--card-2), var(--card));
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    padding: 18px 16px 16px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .plate-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faint);
+    display: flex; justify-content: space-between; margin-bottom: 10px;
+  }
+  .pw {
+    font-family: var(--mono);
+    font-size: 18px; font-weight: 650; line-height: 1.5;
+    letter-spacing: 0.015em;
+    word-break: break-all; overflow-wrap: anywhere;
+    color: var(--text);
+  }
+  .pw.is-hidden { filter: blur(10px); user-select: none; }
+  .plate-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px; gap: 10px;
+  }
+  .bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.07); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 100%; background: var(--mint); border-radius: 2px; }
+  .bar.good i { width: 66%; background: var(--warn); }
+  .bar.fair i { width: 38%; background: var(--bad); }
+  .read { font-family: var(--mono); font-size: 11px; color: var(--faint); white-space: nowrap; }
+  .read b { color: var(--mint); font-weight: 600; }
+
+  .tools { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  .tool {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    padding: 6px 10px; border-radius: var(--r-sm);
+    transition: background .15s, color .15s;
+  }
+  .tool:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .tool .ic { width: 14px; height: 14px; }
+
+  .host {
+    display: flex; align-items: center; gap: 9px;
+    padding: 10px 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-size: 12.5px; color: var(--muted);
+  }
+  .host .ic { width: 14px; height: 14px; color: var(--mint); flex-shrink: 0; }
+  .host span { flex: 1; min-width: 0; }
+  .host b { color: var(--text); font-family: var(--mono); font-weight: 600; font-size: 12px; }
+  .host button { color: var(--faint); padding: 2px; }
+  .host button:hover { color: var(--text); }
+
+  .field {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .field-label {
+    font-size: 11px; font-weight: 650; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--faint);
+    padding: 0 2px;
+  }
+  .seg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px; gap: 4px; }
+  .seg-btn {
+    flex: 1; font-size: 13px; font-weight: 600; color: var(--muted);
+    padding: 8px 0; border-radius: var(--r-sm);
+    transition: background .16s, color .16s;
+  }
+  .seg-btn:hover { color: var(--text); }
+  .seg-btn[aria-pressed="true"] { background: var(--card-2); color: var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .card-txt { flex: 1; min-width: 0; }
+  .card-title { font-size: 13.5px; font-weight: 600; }
+  .card-sub { font-size: 12px; color: var(--faint); margin-top: 2px; line-height: 1.4; }
+  .switch {
+    position: relative; width: 44px; height: 26px; flex-shrink: 0;
+    border-radius: var(--r-pill);
+    background: rgba(255,255,255,0.1);
+    transition: background .2s;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #F2F4F7;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: transform .22s cubic-bezier(.16,1,.3,1);
+  }
+  .switch[aria-checked="true"] { background: var(--mint); }
+  .switch[aria-checked="true"]::after { transform: translateX(18px); }
+
+  .handle {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    background: var(--mint-dim);
+    border: 1px solid rgba(61,220,151,0.18);
+    border-radius: var(--r-md);
+  }
+  .handle .ic { color: var(--mint); width: 15px; height: 15px; }
+  .handle-val {
+    flex: 1; font-family: var(--mono); font-size: 14.5px; font-weight: 600;
+    user-select: all; overflow-wrap: anywhere;
+  }
+  .handle .tool { color: var(--muted); }
+
+  .cta-row { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+  .cta {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    font-size: 14px; font-weight: 650;
+    padding: 13px 16px;
+    border-radius: var(--r-md);
+    transition: transform .08s, filter .15s, background .15s;
+  }
+  .cta:active { transform: scale(0.985); }
+  .cta-main { background: var(--mint); color: var(--mint-ink); }
+  .cta-main:hover { filter: brightness(1.06); }
+  .cta-row-split { display: flex; gap: 8px; }
+  .cta-soft {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 13px; font-weight: 600;
+    padding: 11px 12px;
+  }
+  .cta-soft:hover { background: var(--card-2); }
+
+  .hist-top { display: flex; align-items: baseline; justify-content: space-between; padding-top: 4px; }
+  .hist-title { font-size: 13px; font-weight: 650; }
+  .hist-title span { color: var(--faint); font-weight: 500; font-size: 12px; margin-left: 6px; }
+  .clear { font-size: 12px; font-weight: 600; color: var(--bad); padding: 4px 8px; border-radius: 6px; }
+  .clear:hover { background: rgba(227,124,124,0.08); }
+
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .entry {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .e-head { display: flex; align-items: center; gap: 8px; }
+  .e-site {
+    flex: 1; min-width: 0;
+    background: transparent; border: 0; color: var(--text);
+    font: inherit; font-size: 14px; font-weight: 650; padding: 2px 0;
+  }
+  .e-site::placeholder { color: var(--faint); font-weight: 500; }
+  .e-actions { display: flex; gap: 2px; }
+  .e-actions button { color: var(--faint); padding: 5px; border-radius: 6px; }
+  .e-actions button:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .e-line {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--muted);
+  }
+  .e-line .ic { width: 13px; height: 13px; color: var(--faint); flex-shrink: 0; }
+  .e-line input {
+    flex: 1; min-width: 0;
+    background: transparent; border: 0; color: var(--muted);
+    font: inherit; font-size: 12.5px; padding: 2px 0;
+  }
+  .e-line input::placeholder { color: var(--faint); }
+  .e-line input:hover, .e-line input:focus { color: var(--text); outline: none; }
+  .e-pw {
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+    letter-spacing: 0.14em; overflow-wrap: anywhere; user-select: all;
+    flex: 1;
+  }
+  .e-date { font-size: 11px; color: var(--faint); }
+  .quiet {
+    text-align: center; padding: 48px 20px; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .quiet .ic { width: 32px; height: 32px; color: var(--faint); stroke-width: 1.3; }
+  .quiet p { font-size: 13px; line-height: 1.55; max-width: 250px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: #1E222B; border: 1px solid var(--line-2);
+    color: var(--text); font-size: 12.5px; font-weight: 600;
+    padding: 9px 16px; border-radius: var(--r-pill);
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+    z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media (max-width: 420px) {
+    body { padding: 12px 8px 24px; }
+    .popup { border-radius: 16px; }
+    .view { padding: 0 12px 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="dir-tag">Direction C - Quartz</div>
+<div class="popup">
+
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </span>
+      PassGen
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" id="tabGen" role="tab" aria-selected="true">Generate</button>
+      <button class="tab" id="tabHist" role="tab" aria-selected="false">Saved<span class="count" id="count">3</span></button>
+    </nav>
+  </header>
+
+  <main id="viewGen" class="view" role="tabpanel">
+    <section class="plate">
+      <div class="plate-label">
+        <span>Passphrase</span>
+        <span id="plateMode">Medium</span>
+      </div>
+      <p class="pw" id="pw">calm.river7Bend#moon</p>
+      <div class="plate-foot">
+        <div class="bar" id="bar"><i></i></div>
+        <span class="read" id="read"><b>114</b> bits - 21 chars</span>
+      </div>
+      <div class="tools">
+        <button class="tool" id="btnReveal" aria-pressed="true">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          Show
+        </button>
+        <button class="tool" id="btnNew">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5"/></svg>
+          New
+        </button>
+      </div>
+    </section>
+
+    <div class="host" id="host">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 0 0 20 15 15 0 0 0 0-20"/></svg>
+      <span>Will save for <b>github.com</b></span>
+      <button id="hostX" aria-label="Do not attach this site">
+        <svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="field">
+      <span class="field-label">Length</span>
+      <div class="seg" role="group" aria-label="Password length">
+        <button class="seg-btn" data-mode="short" aria-pressed="false">Short</button>
+        <button class="seg-btn" data-mode="medium" aria-pressed="true">Medium</button>
+        <button class="seg-btn" data-mode="long" aria-pressed="false">Long</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-txt">
+        <div class="card-title">Also generate a username</div>
+        <div class="card-sub">A readable handle for sign-up forms</div>
+      </div>
+      <button class="switch" id="swUser" role="switch" aria-checked="true" aria-label="Also generate a username"></button>
+    </div>
+    <div class="handle" id="handleRow">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="handle-val" id="handleVal">cleverotter847</span>
+      <button class="tool" id="handleNew" aria-label="New username" style="padding:6px;">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-txt">
+        <div class="card-title">Auto-hide</div>
+        <div class="card-sub">Blur the passphrase until you tap Show</div>
+      </div>
+      <button class="switch" id="swHide" role="switch" aria-checked="false" aria-label="Auto-hide password"></button>
+    </div>
+    <div class="card">
+      <div class="card-txt">
+        <div class="card-title">Skip look-alike characters</div>
+        <div class="card-sub">For inserted characters only</div>
+      </div>
+      <button class="switch" id="swSim" role="switch" aria-checked="false" aria-label="Exclude similar characters"></button>
+    </div>
+
+    <div class="cta-row">
+      <button class="cta cta-main" id="btnCopy">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15c-1 0-2-1-2-2V5c0-1 1-2 2-2h8c1 0 2 1 2 2"/></svg>
+        Copy password
+      </button>
+      <div class="cta-row-split">
+        <button class="cta cta-soft" id="btnCopyUser">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15c-1 0-2-1-2-2V5c0-1 1-2 2-2h8c1 0 2 1 2 2"/></svg>
+          Copy username
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <main id="viewHist" class="view" role="tabpanel" hidden>
+    <div class="hist-top">
+      <span class="hist-title">Saved <span id="histCount">3 passwords</span></span>
+      <button class="clear" id="btnClear">Clear all</button>
+    </div>
+    <div class="stack" id="stack"></div>
+    <div class="quiet" id="quiet" hidden>
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <p>Nothing here yet. Copy a password and it lands in this list. Add the site and username so you remember where it belongs.</p>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+"use strict";
+const SET = {
+  short: [
+    { pw: "swift.fox42!kP", bits: 78, chars: 15 },
+    { pw: "bold.lynx8#Neat", bits: 82, chars: 16 }
+  ],
+  medium: [
+    { pw: "calm.river7Bend#moon", bits: 114, chars: 21 },
+    { pw: "quiet.pine16Drift@ember", bits: 121, chars: 23 },
+    { pw: "brave.owl4Skip*lotus9", bits: 108, chars: 21 }
+  ],
+  long: [
+    { pw: "fierce.comet28Vault~orchid&nine", bits: 178, chars: 33 },
+    { pw: "hidden.iris35Forge=delta%wolf.storm", bits: 196, chars: 36 }
+  ]
+};
+const USERS = ["cleverotter847", "nobleocean064", "quietpine21", "amberfalcon12"];
+const $ = id => document.getElementById(id);
+let mode = "medium", idx = 0, uIdx = 0, shown = true;
+let saved = [
+  { id: 1, site: "GitHub", url: "github.com", user: "ankit-builds", pw: "calm.river7Bend#moon", date: "Nov 11, 2026" },
+  { id: 2, site: "Gmail", url: "mail.google.com", user: "", pw: "quiet.pine16Drift@ember", date: "Nov 10, 2026" },
+  { id: 3, site: "Reddit", url: "reddit.com", user: "sunset_forge", pw: "fierce.comet28Vault~orchid&nine", date: "Nov 9, 2026" }
+];
+function toast(m) {
+  const t = $("toast"); t.textContent = m; t.classList.add("show");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 1800);
+}
+function renderPw() {
+  const s = SET[mode][idx % SET[mode].length];
+  $("pw").textContent = s.pw;
+  $("read").innerHTML = "";
+  const b = document.createElement("b"); b.textContent = s.bits;
+  $("read").append(b, " bits - " + s.chars + " chars");
+  $("plateMode").textContent = mode[0].toUpperCase() + mode.slice(1);
+  $("bar").className = "bar";
+}
+function renderUser() { $("handleVal").textContent = USERS[uIdx % USERS.length]; }
+const IC = {
+  eye: '<svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  copy: '<svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px;"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15c-1 0-2-1-2-2V5c0-1 1-2 2-2h8c1 0 2 1 2 2"/></svg>',
+  trash: '<svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  ext: '<svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  user: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  link: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>'
+};
+function act(svg, label, fn) {
+  const b = document.createElement("button");
+  b.innerHTML = svg; b.setAttribute("aria-label", label);
+  b.addEventListener("click", fn);
+  return b;
+}
+function renderHist() {
+  const st = $("stack");
+  st.replaceChildren();
+  $("count").textContent = saved.length;
+  $("histCount").textContent = saved.length + (saved.length === 1 ? " password" : " passwords");
+  $("btnClear").hidden = saved.length === 0;
+  $("quiet").hidden = saved.length !== 0;
+  for (const e of saved) {
+    const en = document.createElement("div"); en.className = "entry";
+    const head = document.createElement("div"); head.className = "e-head";
+    const site = document.createElement("input");
+    site.className = "e-site"; site.value = e.site; site.placeholder = "Where is this for?";
+    site.setAttribute("aria-label", "Site or app name");
+    const acts = document.createElement("div"); acts.className = "e-actions";
+    acts.append(
+      act(IC.trash, "Remove entry", () => { saved = saved.filter(x => x.id !== e.id); renderHist(); toast("Removed"); })
+    );
+    head.append(site, acts);
+    const l1 = document.createElement("div"); l1.className = "e-line";
+    l1.append(Object.assign(document.createElement("span"), { innerHTML: IC.link }));
+    const url = document.createElement("input"); url.value = e.url; url.placeholder = "Website link";
+    url.setAttribute("aria-label", "Website link");
+    l1.append(url);
+    if (e.url) l1.append(act(IC.ext, "Open website", () => {}));
+    const l2 = document.createElement("div"); l2.className = "e-line";
+    l2.append(Object.assign(document.createElement("span"), { innerHTML: IC.user }));
+    const un = document.createElement("input"); un.value = e.user; un.placeholder = "Add username";
+    un.setAttribute("aria-label", "Username");
+    l2.append(un);
+    const l3 = document.createElement("div"); l3.className = "e-line";
+    l3.append(Object.assign(document.createElement("span"), { innerHTML: IC.eye }));
+    const pw = document.createElement("span"); pw.className = "e-pw";
+    pw.textContent = "*".repeat(Math.min(e.pw.length, 20));
+    l3.append(pw,
+      act(IC.eye, "Show password", () => {
+        const r = pw.dataset.r === "1";
+        pw.dataset.r = r ? "" : "1";
+        pw.textContent = r ? "*".repeat(Math.min(e.pw.length, 20)) : e.pw;
+      }),
+      act(IC.copy, "Copy password", () => toast("Password copied"))
+    );
+    const dt = document.createElement("div"); dt.className = "e-date"; dt.textContent = "Saved " + e.date;
+    en.append(head, l1, l2, l3, dt);
+    st.appendChild(en);
+  }
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  const gen = t.id === "tabGen";
+  $("tabGen").setAttribute("aria-selected", gen);
+  $("tabHist").setAttribute("aria-selected", !gen);
+  $("viewGen").hidden = !gen;
+  $("viewHist").hidden = gen;
+}));
+document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => {
+  mode = b.dataset.mode; idx = 0;
+  document.querySelectorAll(".seg-btn").forEach(x => x.setAttribute("aria-pressed", x === b));
+  renderPw();
+}));
+$("btnNew").addEventListener("click", () => { idx++; renderPw(); });
+$("btnReveal").addEventListener("click", () => {
+  shown = !shown;
+  $("pw").classList.toggle("is-hidden", !shown);
+  $("btnReveal").setAttribute("aria-pressed", shown);
+  $("btnReveal").lastChild.textContent = shown ? "Show" : "Hidden";
+});
+$("btnCopy").addEventListener("click", () => toast("Password copied - saved"));
+$("btnCopyUser").addEventListener("click", () => toast("Username copied"));
+$("swUser").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+  e.currentTarget.setAttribute("aria-checked", on);
+  $("handleRow").hidden = !on;
+  $("btnCopyUser").hidden = !on;
+});
+$("swHide").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+  e.currentTarget.setAttribute("aria-checked", on);
+  if (on) { shown = false; $("pw").classList.add("is-hidden"); }
+});
+$("swSim").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+  e.currentTarget.setAttribute("aria-checked", on);
+  idx++; renderPw();
+});
+$("handleNew").addEventListener("click", () => { uIdx++; renderUser(); });
+$("hostX").addEventListener("click", () => { $("host").hidden = true; toast("Site skipped"); });
+$("btnClear").addEventListener("click", () => { saved = []; renderHist(); toast("List cleared"); });
+renderPw(); renderUser(); renderHist();
+</script>
+</body>
+</html>

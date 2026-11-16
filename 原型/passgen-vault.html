@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PassGen - Direction A Vault</title>
+<style>
+  /* Direction A - Vault. Refinement. Password as the object. */
+  :root {
+    --bg: #060608;
+    --stage: #0D0D11;
+    --surface: #101015;
+    --surface-2: #16161D;
+    --line: #23232C;
+    --line-strong: #2E2E3A;
+    --text: #F4F4F6;
+    --muted: #A3A9B5;
+    --faint: #6E7480;
+    --brand: #6366F1;
+    --brand-press: #4F46E5;
+    --brand-soft: rgba(99, 102, 241, 0.12);
+    --ok: #34D399;
+    --warn: #FBBF24;
+    --bad: #F87171;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --r-card: 14px;
+    --r-btn: 10px;
+    --r-pill: 999px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html { color-scheme: dark; }
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99,102,241,0.08), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    display: grid;
+    place-items: start center;
+    padding: 24px 16px 40px;
+  }
+  .dir-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .popup {
+    width: 100%;
+    max-width: 396px;
+    min-height: 520px;
+    background: var(--stage);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  svg { display: block; }
+  .ic { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* header */
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(16,16,21,0.7);
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; letter-spacing: -0.01em; }
+  .brand-mark {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    background: var(--brand-soft);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 7px;
+    color: var(--brand);
+  }
+  .tabs { display: flex; gap: 2px; background: rgba(255,255,255,0.05); padding: 3px; border-radius: var(--r-pill); }
+  .tab {
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    padding: 5px 12px; border-radius: var(--r-pill);
+    transition: color .15s, background .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab[aria-selected="true"] { background: rgba(255,255,255,0.1); color: var(--text); }
+  .badge {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    background: var(--brand); color: #fff;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 8px; display: inline-grid; place-items: center;
+    margin-left: 4px;
+  }
+
+  .view { padding: 14px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+
+  /* password plate - the one signature surface */
+  .plate {
+    position: relative;
+    background:
+      linear-gradient(180deg, var(--surface-2), var(--surface));
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-card);
+    padding: 16px 16px 14px;
+    overflow: hidden;
+  }
+  .plate::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 18px 18px;
+    opacity: 0.35;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black, transparent 75%);
+  }
+  .plate-row { position: relative; display: flex; align-items: flex-start; gap: 8px; }
+  .pw {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+  }
+  .pw.is-hidden { filter: blur(8px); user-select: none; }
+  .ghost-btn {
+    display: grid; place-items: center;
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    color: var(--muted);
+    flex-shrink: 0;
+    transition: background .15s, color .15s;
+  }
+  .ghost-btn:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+  .meter { position: relative; display: flex; gap: 3px; margin-top: 12px; }
+  .meter i {
+    flex: 1; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.08);
+    transition: background .3s;
+  }
+  .meter.strong i { background: var(--ok); }
+  .meter.good i:nth-child(-n+8) { background: var(--warn); }
+  .meter.fair i:nth-child(-n+5) { background: var(--bad); }
+  .meta {
+    position: relative;
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 8px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .lvl { font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .lvl.strong { color: var(--ok); }
+  .lvl.good { color: var(--warn); }
+  .lvl.fair { color: var(--bad); }
+  .bits { color: var(--faint); }
+
+  /* detected site */
+  .chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 8px 8px 10px;
+    background: var(--brand-soft);
+    border: 1px solid rgba(99,102,241,0.28);
+    border-radius: var(--r-btn);
+    font-size: 12px; color: var(--muted);
+  }
+  .chip .ic { width: 14px; height: 14px; color: var(--brand); flex-shrink: 0; }
+  .chip b { color: var(--text); font-family: var(--mono); font-weight: 600; font-size: 12px; }
+  .chip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* segmented */
+  .seg { display: flex; background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px; }
+  .seg-btn {
+    flex: 1; font-size: 12.5px; font-weight: 600; color: var(--muted);
+    padding: 7px 0; border-radius: var(--r-pill);
+    transition: background .18s, color .18s;
+  }
+  .seg-btn:hover { color: var(--text); }
+  .seg-btn[aria-pressed="true"] { background: rgba(255,255,255,0.12); color: var(--text); }
+
+  /* rows / switches */
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-btn);
+  }
+  .row-txt { flex: 1; min-width: 0; }
+  .row-title { font-size: 13px; font-weight: 600; }
+  .row-sub { font-size: 11.5px; color: var(--faint); margin-top: 1px; }
+  .switch {
+    position: relative; width: 40px; height: 24px; flex-shrink: 0;
+    border-radius: var(--r-pill);
+    background: rgba(255,255,255,0.12);
+    transition: background .2s;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff;
+    transition: transform .2s cubic-bezier(.16,1,.3,1);
+  }
+  .switch[aria-checked="true"] { background: var(--brand); }
+  .switch[aria-checked="true"]::after { transform: translateX(16px); }
+
+  .user-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    background: var(--brand-soft);
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: var(--r-btn);
+  }
+  .user-row .ic { color: var(--brand); width: 15px; height: 15px; }
+  .user-val {
+    flex: 1; font-family: var(--mono); font-size: 14px; font-weight: 600;
+    overflow-wrap: anywhere; user-select: all;
+  }
+
+  /* actions */
+  .actions { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 13px; font-weight: 700;
+    padding: 11px 14px;
+    border-radius: var(--r-btn);
+    transition: transform .08s, background .15s, border-color .15s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:hover { background: var(--brand-press); }
+  .btn-ghost {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--line);
+    color: var(--text);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.08); }
+  .actions-row { display: flex; gap: 8px; }
+  .actions-row .btn { flex: 1; }
+
+  /* history */
+  .hist-head { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+  .hist-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .link-danger { font-size: 12px; font-weight: 600; color: var(--bad); padding: 4px 8px; border-radius: 6px; }
+  .link-danger:hover { background: rgba(248,113,113,0.1); }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-btn);
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .item-top { display: flex; align-items: center; gap: 6px; }
+  .site {
+    flex: 1; min-width: 0;
+    background: transparent; border: 0; color: var(--text);
+    font: inherit; font-size: 13px; font-weight: 700;
+    padding: 2px 0; border-bottom: 1px dashed transparent;
+  }
+  .site:hover, .site:focus { border-bottom-color: var(--brand); outline: none; }
+  .item-sub {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted);
+  }
+  .item-sub .ic { width: 13px; height: 13px; color: var(--faint); flex-shrink: 0; }
+  .url, .uname {
+    flex: 1; min-width: 0;
+    background: transparent; border: 0; color: var(--muted);
+    font: inherit; font-size: 12px; padding: 2px 0;
+    border-bottom: 1px dashed transparent;
+  }
+  .url:hover, .url:focus, .uname:hover, .uname:focus { border-bottom-color: var(--brand); color: var(--text); outline: none; }
+  .pw-line { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 12.5px; }
+  .pw-line .ic { width: 13px; height: 13px; color: var(--faint); }
+  .masked { flex: 1; letter-spacing: 0.12em; color: var(--muted); overflow-wrap: anywhere; user-select: all; }
+  .item-date { font-size: 10.5px; color: var(--faint); }
+  .empty {
+    text-align: center; padding: 40px 16px; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .empty .ic { width: 28px; height: 28px; color: var(--faint); stroke-width: 1.4; }
+  .empty p { font-size: 13px; max-width: 260px; line-height: 1.5; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    background: #1A1A22; border: 1px solid var(--line-strong);
+    color: var(--text); font-size: 12.5px; font-weight: 600;
+    padding: 8px 16px; border-radius: var(--r-pill);
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+    z-index: 10; max-width: calc(100% - 32px);
+  }
+  .toast.show { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media (max-width: 420px) {
+    body { padding: 12px 8px 24px; }
+    .popup { border-radius: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="dir-tag">Direction A - Vault</div>
+<div class="popup">
+
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </span>
+      PassGen
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" id="tabGen" role="tab" aria-selected="true">Generator</button>
+      <button class="tab" id="tabHist" role="tab" aria-selected="false">History<span class="badge" id="histBadge">3</span></button>
+    </nav>
+  </header>
+
+  <main id="viewGen" class="view" role="tabpanel">
+    <section class="plate">
+      <div class="plate-row">
+        <p class="pw" id="pw">calm.river7Bend#moon</p>
+        <button class="ghost-btn" id="btnReveal" aria-label="Show or hide password" aria-pressed="true">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="meter strong" id="meter" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <div class="meta">
+        <span class="lvl strong" id="lvl">Strong</span>
+        <span class="bits" id="bits">20 chars - 3 words - 114 bits</span>
+      </div>
+    </section>
+
+    <div class="chip" id="chip">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 0 0 20 15 15 0 0 0 0-20"/></svg>
+      <span>Will save for <b id="chipSite">github.com</b></span>
+      <button class="ghost-btn" id="chipX" aria-label="Do not attach this site" style="width:26px;height:26px;">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px;"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="seg" role="group" aria-label="Password length">
+      <button class="seg-btn" data-mode="short" aria-pressed="false">Short</button>
+      <button class="seg-btn" data-mode="medium" aria-pressed="true">Medium</button>
+      <button class="seg-btn" data-mode="long" aria-pressed="false">Long</button>
+    </div>
+
+    <div class="row">
+      <div class="row-txt">
+        <div class="row-title">Also generate a username</div>
+        <div class="row-sub">A readable handle for sign-up forms</div>
+      </div>
+      <button class="switch" id="swUser" role="switch" aria-checked="true" aria-label="Also generate a username"></button>
+    </div>
+    <div class="user-row" id="userRow">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="user-val" id="userVal">cleverotter847</span>
+      <button class="ghost-btn" id="btnUserNew" aria-label="New username" style="width:26px;height:26px;">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px;"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="row-txt">
+        <div class="row-title">Auto-hide password</div>
+        <div class="row-sub">Blur until you tap to reveal</div>
+      </div>
+      <button class="switch" id="swHide" role="switch" aria-checked="false" aria-label="Auto-hide password"></button>
+    </div>
+    <div class="row">
+      <div class="row-txt">
+        <div class="row-title">Exclude similar characters</div>
+        <div class="row-sub">Skip 0/O and 1/l in inserted characters</div>
+      </div>
+      <button class="switch" id="swSim" role="switch" aria-checked="false" aria-label="Exclude similar characters"></button>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="btnCopy">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15c-1 0-2-1-2-2V5c0-1 1-2 2-2h8c1 0 2 1 2 2"/></svg>
+        Copy password
+      </button>
+      <div class="actions-row">
+        <button class="btn btn-ghost" id="btnNew">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5"/></svg>
+          New password
+        </button>
+        <button class="btn btn-ghost" id="btnCopyUser">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15c-1 0-2-1-2-2V5c0-1 1-2 2-2h8c1 0 2 1 2 2"/></svg>
+          Copy username
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <main id="viewHist" class="view" role="tabpanel" hidden>
+    <div class="hist-head">
+      <span class="hist-title">Saved passwords</span>
+      <button class="link-danger" id="btnClear">Clear all</button>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="empty" id="empty" hidden>
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <p>Nothing saved yet. Copy a password and it appears here. Add the site and username so you remember where it belongs.</p>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+"use strict";
+const SAMPLES = {
+  short: [
+    { pw: "swift.fox42!kP", bits: 78, words: 2, chars: 15, level: "strong" },
+    { pw: "bold.lynx8#Neat", bits: 82, words: 2, chars: 16, level: "strong" }
+  ],
+  medium: [
+    { pw: "calm.river7Bend#moon", bits: 114, words: 3, chars: 21, level: "strong" },
+    { pw: "quiet.pine16Drift@ember", bits: 121, words: 3, chars: 23, level: "strong" },
+    { pw: "brave.owl4Skip*lotus9", bits: 108, words: 3, chars: 21, level: "strong" }
+  ],
+  long: [
+    { pw: "fierce.comet28Vault~orchid&nine", bits: 178, words: 4, chars: 33, level: "strong" },
+    { pw: "hidden.iris35Forge=delta%wolf.storm", bits: 196, words: 5, chars: 36, level: "strong" }
+  ]
+};
+const USERS = ["cleverotter847", "nobleocean064", "quietpine21", "amberfalcon12"];
+const $ = id => document.getElementById(id);
+let mode = "medium", idx = 0, userIdx = 0, revealed = true;
+let history = [
+  { id: "a1", site: "GitHub", url: "github.com", user: "ankit-builds", pw: "calm.river7Bend#moon", date: "Nov 11, 2026" },
+  { id: "a2", site: "Gmail", url: "mail.google.com", user: "", pw: "quiet.pine16Drift@ember", date: "Nov 10, 2026" },
+  { id: "a3", site: "Reddit", url: "reddit.com", user: "sunset_forge", pw: "fierce.comet28Vault~orchid&nine", date: "Nov 9, 2026" }
+];
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 1800);
+}
+function renderPw() {
+  const s = SAMPLES[mode][idx % SAMPLES[mode].length];
+  $("pw").textContent = s.pw;
+  $("bits").textContent = s.chars + " chars - " + s.words + " words - " + s.bits + " bits";
+  $("lvl").textContent = s.level[0].toUpperCase() + s.level.slice(1);
+  $("lvl").className = "lvl " + s.level;
+  $("meter").className = "meter " + s.level;
+}
+function renderUser() { $("userVal").textContent = USERS[userIdx % USERS.length]; }
+function iconBtn(svg, label, extra) {
+  const b = document.createElement("button");
+  b.className = "ghost-btn";
+  b.style.width = "26px"; b.style.height = "26px";
+  b.setAttribute("aria-label", label);
+  b.innerHTML = svg;
+  if (extra) extra(b);
+  return b;
+}
+const I = {
+  eye: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  copy: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15c-1 0-2-1-2-2V5c0-1 1-2 2-2h8c1 0 2 1 2 2"/></svg>',
+  trash: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  ext: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  user: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  link: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
+  lock: '<svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+};
+function renderHist() {
+  const list = $("list");
+  list.replaceChildren();
+  $("histBadge").textContent = history.length;
+  $("histBadge").hidden = history.length === 0;
+  $("btnClear").hidden = history.length === 0;
+  $("empty").hidden = history.length !== 0;
+  for (const e of history) {
+    const item = document.createElement("div");
+    item.className = "item";
+    const top = document.createElement("div");
+    top.className = "item-top";
+    const site = document.createElement("input");
+    site.className = "site"; site.value = e.site; site.placeholder = "Where is this for?";
+    site.setAttribute("aria-label", "Site or app name");
+    top.append(site, iconBtn(I.trash, "Remove entry", b => b.addEventListener("click", () => {
+      history = history.filter(x => x.id !== e.id);
+      renderHist(); toast("Entry removed");
+    })));
+    const sub1 = document.createElement("div");
+    sub1.className = "item-sub";
+    sub1.append(Object.assign(document.createElement("span"), { innerHTML: I.link, style: "display:grid" }));
+    const url = document.createElement("input");
+    url.className = "url"; url.value = e.url; url.placeholder = "Website link";
+    url.setAttribute("aria-label", "Website link");
+    sub1.append(url);
+    if (e.url) sub1.append(iconBtn(I.ext, "Open website"));
+    const sub2 = document.createElement("div");
+    sub2.className = "item-sub";
+    sub2.append(Object.assign(document.createElement("span"), { innerHTML: I.user, style: "display:grid" }));
+    const un = document.createElement("input");
+    un.className = "uname"; un.value = e.user; un.placeholder = "Add username";
+    un.setAttribute("aria-label", "Username");
+    sub2.append(un, iconBtn(I.copy, "Copy username", b => { if (!e.user) b.hidden = true; }));
+    const pw = document.createElement("div");
+    pw.className = "pw-line";
+    pw.append(Object.assign(document.createElement("span"), { innerHTML: I.lock, style: "display:grid" }));
+    const mask = document.createElement("span");
+    mask.className = "masked";
+    mask.textContent = "*".repeat(Math.min(e.pw.length, 22));
+    pw.append(mask, iconBtn(I.eye, "Show password", b => b.addEventListener("click", () => {
+      const showing = mask.dataset.rev === "1";
+      mask.dataset.rev = showing ? "" : "1";
+      mask.textContent = showing ? "*".repeat(Math.min(e.pw.length, 22)) : e.pw;
+    })), iconBtn(I.copy, "Copy password"));
+    const date = document.createElement("div");
+    date.className = "item-date";
+    date.textContent = "Saved " + e.date;
+    item.append(top, sub1, sub2, pw, date);
+    list.appendChild(item);
+  }
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  const gen = t.id === "tabGen";
+  $("tabGen").setAttribute("aria-selected", gen);
+  $("tabHist").setAttribute("aria-selected", !gen);
+  $("viewGen").hidden = !gen;
+  $("viewHist").hidden = gen;
+}));
+document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => {
+  mode = b.dataset.mode; idx = 0;
+  document.querySelectorAll(".seg-btn").forEach(x => x.setAttribute("aria-pressed", x === b));
+  renderPw();
+}));
+$("btnNew").addEventListener("click", () => { idx++; renderPw(); toast("New password"); });
+$("btnReveal").addEventListener("click", () => {
+  revealed = !revealed;
+  $("pw").classList.toggle("is-hidden", !revealed);
+  $("btnReveal").setAttribute("aria-pressed", revealed);
+});
+$("btnCopy").addEventListener("click", () => toast("Password copied - saved to History"));
+$("btnCopyUser").addEventListener("click", () => toast("Username copied"));
+$("btnUserNew").addEventListener("click", () => { userIdx++; renderUser(); });
+$("swUser").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+  e.currentTarget.setAttribute("aria-checked", on);
+  $("userRow").hidden = !on;
+  $("btnCopyUser").hidden = !on;
+});
+$("swHide").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+  e.currentTarget.setAttribute("aria-checked", on);
+  if (on) { revealed = false; $("pw").classList.add("is-hidden"); }
+});
+$("swSim").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+  e.currentTarget.setAttribute("aria-checked", on);
+  idx++; renderPw();
+});
+$("chipX").addEventListener("click", () => { $("chip").hidden = true; toast("Site skipped"); });
+$("btnClear").addEventListener("click", () => {
+  if (!history.length) return;
+  history = [];
+  renderHist(); toast("History cleared");
+});
+renderPw(); renderUser(); renderHist();
+</script>
+</body>
+</html>

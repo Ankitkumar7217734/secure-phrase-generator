@@ -1,0 +1,24 @@
+{
+    "manifest_version": 3,
+    "name": "Secure Phrase Generator",
+    "short_name": "PassGen",
+    "version": "1.1.0",
+    "description": "Generate strong passphrases and usernames. Copied passwords are saved to a history you can label with the site name, website link and username, like a mini password manager.",
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "Secure Phrase Generator",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "32": "icons/icon32.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "permissions": ["storage", "clipboardWrite", "activeTab"]
+}
